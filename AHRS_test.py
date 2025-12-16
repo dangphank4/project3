@@ -11,7 +11,7 @@ ACC_TRUST_THRESHOLD = 0.15 #Ngưỡng tin cậy của gia tốc kế
 BETA_MIN = 0.04 #Giá trị beta tối thiểu cho bộ lọc Madgwick
 BETA_MAX = 0.15 #Giá trị beta tối đa cho bộ lọc Madgwick
 GYRO_CALIB_SAMPLES = 150 #Số mẫu để hiệu chuẩn con quay hồi chuyển
-YAW_COMPL_ALPHA = 0.3 # Hệ số lọc thông thấp cho góc yaw (None để tắt)
+YAW_COMPL_ALPHA = 0.6 # Hệ số lọc thông thấp cho góc yaw (None để tắt)
 
 MAG_UNIT_CONVERSION = 100000.0 
 GRAVITY = 9.80665
@@ -219,22 +219,22 @@ def update_orientation(icm, madgwick_filter, q, acc_data, gyr_data, mag_data, dt
 
     q_new = None
     try:
-        if mag_valid and np.linalg.norm(mag_data) > 1e-9 and acc_trust > 0.0:
-            q_new = madgwick_filter.updateMARG(q=q, acc=acc_data, gyr=gyr_data, mag=mag_data)
-        else:
-            if hasattr(madgwick_filter, "updateIMU"):
-                q_new = madgwick_filter.updateIMU(q=q, acc=acc_data, gyr=gyr_data)
-            elif hasattr(madgwick_filter, "update"):
+        
+        if hasattr(madgwick_filter, "updateIMU"):
+            q_new = madgwick_filter.updateIMU(q=q, acc=acc_data, gyr=gyr_data)
+        elif hasattr(madgwick_filter, "update"):
+            try:
+                # attempt 6-DOF signature
+                q_new = madgwick_filter.update(q=q, gyr=gyr_data, acc=acc_data)
+            except TypeError:
+                # fallback: call with q,gyr,acc order
                 try:
-                    # attempt 6-DOF signature
-                    q_new = madgwick_filter.update(q=q, gyr=gyr_data, acc=acc_data)
-                except TypeError:
-                    # fallback: call with q,gyr,acc order
-                    try:
-                        q_new = madgwick_filter.update(q, gyr_data, acc_data)
-                    except Exception:
-                        q_new = None
-            else:
+                    q_new = madgwick_filter.update(q, gyr_data, acc_data)
+                except Exception:
+                    q_new = None
+        elif mag_valid and np.linalg.norm(mag_data) > 1e-9 and acc_trust > 0.0:
+            q_new = madgwick_filter.updateMARG(q=q, acc=acc_data, gyr=gyr_data, mag=mag_data)            
+        else:
                 q_new = None
     except Exception as e:
         print("Madgwick update exception:", e)
